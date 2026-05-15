@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
+import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
 import { getErrorMessage } from '../../utils/errorHandler';
 import { formatearRut } from '../../utils/rutUtils';
 
 export default function GestionUsuarios() {
+  const { user } = useAuth();
   const [usuarios, setUsuarios] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [editando, setEditando] = useState(null);
@@ -58,10 +60,27 @@ export default function GestionUsuarios() {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('¿Eliminar este usuario?')) return;
+  const handleDesactivar = async (id) => {
+    if (!window.confirm('¿Desactivar este usuario? Ya no podrá iniciar sesión.')) return;
     try {
       await api.delete(`/usuarios/${id}`);
+      fetchUsuarios();
+    } catch (err) {
+      alert(getErrorMessage(err));
+    }
+  };
+
+  const handleActivar = async (u) => {
+    if (!window.confirm('¿Activar este usuario?')) return;
+    try {
+      await api.put(`/usuarios/${u.id}`, {
+        nombres: u.nombres,
+        apellidos: u.apellidos,
+        email: u.email,
+        rut: u.rut,
+        rol: u.rol.replace('ROLE_', ''),
+        enabled: true,
+      });
       fetchUsuarios();
     } catch (err) {
       alert(getErrorMessage(err));
@@ -88,12 +107,13 @@ export default function GestionUsuarios() {
                 <th className="text-left py-3 px-4 text-gray-500 font-medium">Email</th>
                 <th className="text-left py-3 px-4 text-gray-500 font-medium">RUT</th>
                 <th className="text-left py-3 px-4 text-gray-500 font-medium">Rol</th>
+                <th className="text-left py-3 px-4 text-gray-500 font-medium">Estado</th>
                 <th className="text-right py-3 px-4 text-gray-500 font-medium">Acciones</th>
               </tr>
             </thead>
             <tbody>
               {usuarios.map((u) => (
-                <tr key={u.id} className="border-b border-gray-50 hover:bg-gray-50">
+                <tr key={u.id} className={`border-b border-gray-50 hover:bg-gray-50 ${u.enabled === false ? 'bg-gray-100' : ''}`}>
                   <td className="py-3 px-4 font-medium">{u.nombres} {u.apellidos}</td>
                   <td className="py-3 px-4 text-gray-600">{u.email}</td>
                   <td className="py-3 px-4 text-gray-600">{u.rut}</td>
@@ -104,9 +124,22 @@ export default function GestionUsuarios() {
                       'bg-green-100 text-green-700'
                     }`}>{u.rol?.replace('ROLE_', '')}</span>
                   </td>
+                  <td className="py-3 px-4">
+                    {u.enabled === false ? (
+                      <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">Inactivo</span>
+                    ) : (
+                      <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">Activo</span>
+                    )}
+                  </td>
                   <td className="py-3 px-4 text-right">
                     <button onClick={() => openEdit(u)} className="text-blue-600 hover:text-blue-800 mr-3 text-sm font-medium">Editar</button>
-                    <button onClick={() => handleDelete(u.id)} className="text-red-600 hover:text-red-800 text-sm font-medium">Eliminar</button>
+                    {u.id === user.id ? (
+                      <span className="text-gray-400 text-sm mr-3">(Usuario actual)</span>
+                    ) : u.enabled === false ? (
+                      <button onClick={() => handleActivar(u)} className="text-green-600 hover:text-green-800 text-sm font-medium">Activar</button>
+                    ) : (
+                      <button onClick={() => handleDesactivar(u.id)} className="text-red-600 hover:text-red-800 text-sm font-medium">Desactivar</button>
+                    )}
                   </td>
                 </tr>
               ))}

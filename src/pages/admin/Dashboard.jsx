@@ -63,7 +63,7 @@ export default function Dashboard() {
       api.get('/calificaciones/mis-calificaciones')
         .then(r => setDocenteNotasCount(r.data.length))
         .catch(() => {});
-      api.get('/anotaciones')
+      api.get(`/anotaciones/docente/${user.id}`)
         .then(r => setUltimasAnotaciones(r.data.slice(-5).reverse()))
         .catch(() => {});
       api.get('/usuarios')

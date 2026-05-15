@@ -11,14 +11,34 @@ export default function RegistroAnotaciones() {
   const [success, setSuccess] = useState('');
 
   useEffect(() => {
-    api.get('/usuarios')
-      .then(r => setEstudiantes(
-        r.data
-          .filter(u => u.rol === 'ESTUDIANTE')
-          .sort((a, b) => `${a.apellidos} ${a.nombres}`.localeCompare(`${b.apellidos} ${b.nombres}`))
-      ))
-      .catch(() => {});
-  }, []);
+    if (user?.id) {
+      api.get(`/asignaturas/docente/${user.id}`)
+        .then(async (asignaturasRes) => {
+          const asigs = asignaturasRes.data;
+          const cursoIds = [...new Set(asigs.map(a => a.cursoId))];
+          
+          let todosEstudiantes = [];
+          for (const cursoId of cursoIds) {
+            try {
+              const matRes = await api.get(`/matriculas/curso/${cursoId}`);
+              const mats = matRes.data;
+              const estIds = mats.map(m => m.estudianteId);
+              todosEstudiantes = [...todosEstudiantes, ...estIds];
+            } catch {}
+          }
+          
+          const estIdsUnicos = [...new Set(todosEstudiantes)];
+          
+          const usuariosRes = await api.get('/usuarios');
+          const estudiantesFiltrados = usuariosRes.data
+            .filter(u => u.rol === 'ESTUDIANTE' && estIdsUnicos.includes(u.id))
+            .sort((a, b) => `${a.apellidos} ${a.nombres}`.localeCompare(`${b.apellidos} ${b.nombres}`));
+          
+          setEstudiantes(estudiantesFiltrados);
+        })
+        .catch(() => {});
+    }
+  }, [user]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
