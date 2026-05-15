@@ -8,6 +8,7 @@ export default function GestionMatriculas() {
   const [cursos, setCursos] = useState([]);
   const [selectedCurso, setSelectedCurso] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const [editando, setEditando] = useState(null);
   const [form, setForm] = useState({ estudianteId: '', cursoId: '' });
   const [loading, setLoading] = useState(false);
 
@@ -41,18 +42,46 @@ export default function GestionMatriculas() {
     return est ? `${est.nombres} ${est.apellidos}` : `ID: ${estudianteId}`;
   };
 
-  const handleMatricular = async (e) => {
+  const openCreate = () => {
+    setEditando(null);
+    setForm({ estudianteId: '', cursoId: '' });
+    setShowModal(true);
+  };
+
+  const openEdit = (mat) => {
+    setEditando(mat);
+    setForm({ estudianteId: String(mat.estudianteId), cursoId: String(mat.cursoId) });
+    setShowModal(true);
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
-      await api.post('/matriculas', { estudianteId: parseInt(form.estudianteId), cursoId: parseInt(form.cursoId) });
+      const payload = { estudianteId: parseInt(form.estudianteId), cursoId: parseInt(form.cursoId) };
+      if (editando) {
+        await api.put(`/matriculas/${editando.id}`, payload);
+      } else {
+        await api.post('/matriculas', payload);
+      }
       setShowModal(false);
       setForm({ estudianteId: '', cursoId: '' });
+      setEditando(null);
       fetchMatriculas();
     } catch (err) {
       alert(getErrorMessage(err));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('¿Eliminar esta matrícula? Esta acción no se puede deshacer.')) return;
+    try {
+      await api.delete(`/matriculas/${id}`);
+      fetchMatriculas();
+    } catch (err) {
+      alert(getErrorMessage(err));
     }
   };
 
@@ -63,7 +92,7 @@ export default function GestionMatriculas() {
           <h1 className="text-2xl font-bold text-gray-800">Matrículas</h1>
           <p className="text-gray-500 mt-1">Gestión de matrículas</p>
         </div>
-        <button onClick={() => setShowModal(true)} className="bg-primary-800 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium">+ Matricular</button>
+        <button onClick={openCreate} className="bg-primary-800 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium">+ Matricular</button>
       </div>
       <div className="flex items-center gap-4">
         <label className="text-sm font-medium text-gray-700">Filtrar por curso:</label>
@@ -79,6 +108,7 @@ export default function GestionMatriculas() {
               <tr>
                 <th className="text-left py-3 px-4 text-gray-500 font-medium">Estudiante</th>
                 <th className="text-left py-3 px-4 text-gray-500 font-medium">Curso</th>
+                <th className="text-right py-3 px-4 text-gray-500 font-medium">Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -86,20 +116,24 @@ export default function GestionMatriculas() {
                 <tr key={m.id} className="border-b border-gray-50 hover:bg-gray-50">
                   <td className="py-3 px-4">{getEstudianteNombre(m.estudianteId)}</td>
                   <td className="py-3 px-4 text-gray-600">{getCursoNombre(m.cursoId)}</td>
+                  <td className="py-3 px-4 text-right">
+                    <button onClick={() => openEdit(m)} className="text-blue-600 hover:text-blue-800 mr-3 text-sm font-medium">Editar</button>
+                    <button onClick={() => handleDelete(m.id)} className="text-red-600 hover:text-red-800 text-sm font-medium">Eliminar</button>
+                  </td>
                 </tr>
               ))}
               {matriculas.length === 0 && (
-                <tr><td colSpan={2} className="py-8 text-center text-gray-400">No hay matrículas registradas</td></tr>
+                <tr><td colSpan={3} className="py-8 text-center text-gray-400">No hay matrículas registradas</td></tr>
               )}
             </tbody>
           </table>
         </div>
       </div>
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowModal(false)}>
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => { setShowModal(false); setEditando(null); }}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-xl font-bold text-gray-800 mb-6">Nueva Matrícula</h2>
-            <form onSubmit={handleMatricular} className="space-y-4">
+            <h2 className="text-xl font-bold text-gray-800 mb-6">{editando ? 'Editar Matrícula' : 'Nueva Matrícula'}</h2>
+            <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Estudiante</label>
                 <select value={form.estudianteId} onChange={(e) => setForm({ ...form, estudianteId: e.target.value })} required className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none">
@@ -115,9 +149,9 @@ export default function GestionMatriculas() {
                 </select>
               </div>
               <div className="flex justify-end gap-3 pt-2">
-                <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 text-sm text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">Cancelar</button>
+                <button type="button" onClick={() => { setShowModal(false); setEditando(null); }} className="px-4 py-2 text-sm text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">Cancelar</button>
                 <button type="submit" disabled={loading} className="px-4 py-2 text-sm text-white bg-primary-800 rounded-lg hover:bg-primary-700 disabled:opacity-50">
-                  {loading ? 'Matriculando...' : 'Matricular'}
+                  {loading ? 'Guardando...' : editando ? 'Guardar Cambios' : 'Matricular'}
                 </button>
               </div>
             </form>

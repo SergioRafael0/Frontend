@@ -7,6 +7,7 @@ export default function GestionAsignaturas() {
   const [docentes, setDocentes] = useState([]);
   const [cursos, setCursos] = useState([]);
   const [showModal, setShowModal] = useState(false);
+  const [editando, setEditando] = useState(null);
   const [form, setForm] = useState({ nombre: '', docenteId: '', cursoId: '' });
   const [loading, setLoading] = useState(false);
 
@@ -47,18 +48,46 @@ export default function GestionAsignaturas() {
     return docente ? `${docente.nombres} ${docente.apellidos}` : `ID: ${docenteId}`;
   };
 
-  const handleCreate = async (e) => {
+  const openCreate = () => {
+    setEditando(null);
+    setForm({ nombre: '', docenteId: '', cursoId: '' });
+    setShowModal(true);
+  };
+
+  const openEdit = (asig) => {
+    setEditando(asig);
+    setForm({ nombre: asig.nombre, docenteId: String(asig.docenteId), cursoId: String(asig.cursoId) });
+    setShowModal(true);
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
-      await api.post('/asignaturas', { nombre: form.nombre, docenteId: parseInt(form.docenteId), cursoId: parseInt(form.cursoId) });
+      const payload = { nombre: form.nombre, docenteId: parseInt(form.docenteId), cursoId: parseInt(form.cursoId) };
+      if (editando) {
+        await api.put(`/asignaturas/${editando.id}`, payload);
+      } else {
+        await api.post('/asignaturas', payload);
+      }
       setShowModal(false);
       setForm({ nombre: '', docenteId: '', cursoId: '' });
+      setEditando(null);
       fetchAsignaturas();
     } catch (err) {
       alert(getErrorMessage(err));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('¿Eliminar esta asignatura? Esta acción no se puede deshacer.')) return;
+    try {
+      await api.delete(`/asignaturas/${id}`);
+      fetchAsignaturas();
+    } catch (err) {
+      alert(getErrorMessage(err));
     }
   };
 
@@ -69,7 +98,7 @@ export default function GestionAsignaturas() {
           <h1 className="text-2xl font-bold text-gray-800">Asignaturas</h1>
           <p className="text-gray-500 mt-1">Gestión de asignaturas del colegio</p>
         </div>
-        <button onClick={() => setShowModal(true)} className="bg-primary-800 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium">+ Nueva Asignatura</button>
+        <button onClick={openCreate} className="bg-primary-800 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium">+ Nueva Asignatura</button>
       </div>
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
@@ -79,6 +108,7 @@ export default function GestionAsignaturas() {
                 <th className="text-left py-3 px-4 text-gray-500 font-medium">Nombre</th>
                 <th className="text-left py-3 px-4 text-gray-500 font-medium">Curso</th>
                 <th className="text-left py-3 px-4 text-gray-500 font-medium">Docente</th>
+                <th className="text-right py-3 px-4 text-gray-500 font-medium">Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -87,20 +117,24 @@ export default function GestionAsignaturas() {
                   <td className="py-3 px-4 font-medium">{a.nombre}</td>
                   <td className="py-3 px-4 text-gray-600">{getCursoNombre(a.cursoId)}</td>
                   <td className="py-3 px-4 text-gray-600">{getDocenteNombre(a.docenteId)}</td>
+                  <td className="py-3 px-4 text-right">
+                    <button onClick={() => openEdit(a)} className="text-blue-600 hover:text-blue-800 mr-3 text-sm font-medium">Editar</button>
+                    <button onClick={() => handleDelete(a.id)} className="text-red-600 hover:text-red-800 text-sm font-medium">Eliminar</button>
+                  </td>
                 </tr>
               ))}
               {asignaturas.length === 0 && (
-                <tr><td colSpan={3} className="py-8 text-center text-gray-400">No hay asignaturas registradas</td></tr>
+                <tr><td colSpan={4} className="py-8 text-center text-gray-400">No hay asignaturas registradas</td></tr>
               )}
             </tbody>
           </table>
         </div>
       </div>
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowModal(false)}>
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => { setShowModal(false); setEditando(null); }}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-xl font-bold text-gray-800 mb-6">Nueva Asignatura</h2>
-            <form onSubmit={handleCreate} className="space-y-4">
+            <h2 className="text-xl font-bold text-gray-800 mb-6">{editando ? 'Editar Asignatura' : 'Nueva Asignatura'}</h2>
+            <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
                 <input value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} required className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none" />
@@ -120,9 +154,9 @@ export default function GestionAsignaturas() {
                 </select>
               </div>
               <div className="flex justify-end gap-3 pt-2">
-                <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 text-sm text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">Cancelar</button>
+                <button type="button" onClick={() => { setShowModal(false); setEditando(null); }} className="px-4 py-2 text-sm text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">Cancelar</button>
                 <button type="submit" disabled={loading} className="px-4 py-2 text-sm text-white bg-primary-800 rounded-lg hover:bg-primary-700 disabled:opacity-50">
-                  {loading ? 'Creando...' : 'Crear'}
+                  {loading ? 'Guardando...' : editando ? 'Guardar Cambios' : 'Crear'}
                 </button>
               </div>
             </form>

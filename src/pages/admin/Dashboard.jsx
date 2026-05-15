@@ -1,14 +1,25 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 
 export default function Dashboard() {
   const { user, getRole } = useAuth();
+  const navigate = useNavigate();
   const role = getRole();
   const [stats, setStats] = useState({ usuarios: 0, cursos: 0, estudiantes: 0, docentes: 0 });
   const [usuarios, setUsuarios] = useState([]);
   const [asistenciasCount, setAsistenciasCount] = useState(0);
   const [misNotas, setMisNotas] = useState([]);
+  const [docenteAsigCount, setDocenteAsigCount] = useState(0);
+  const [docenteEstCount, setDocenteEstCount] = useState(0);
+  const [docenteNotasCount, setDocenteNotasCount] = useState(0);
+  const [ultimasAnotaciones, setUltimasAnotaciones] = useState([]);
+  const [todosUsuarios, setTodosUsuarios] = useState([]);
+  const [estAnotaciones, setEstAnotaciones] = useState([]);
+  const [estCursosCount, setEstCursosCount] = useState(0);
+  const [estAsistenciaPresente, setEstAsistenciaPresente] = useState(0);
+  const [estAsistenciaTotal, setEstAsistenciaTotal] = useState(0);
 
   useEffect(() => {
     if (role === 'ADMIN') {
@@ -36,11 +47,44 @@ export default function Dashboard() {
       fetchData();
     } else if (role === 'DOCENTE') {
       api.get(`/asignaturas/docente/${user.id}`)
-        .then(r => setStats(prev => ({ ...prev, cursos: r.data.length })))
+        .then(async r => {
+          const asigs = r.data;
+          setDocenteAsigCount(asigs.length);
+          let totalEst = 0;
+          for (const a of asigs) {
+            try {
+              const matRes = await api.get(`/matriculas/curso/${a.cursoId}`);
+              totalEst += matRes.data.length;
+            } catch {}
+          }
+          setDocenteEstCount(totalEst);
+        })
+        .catch(() => {});
+      api.get('/calificaciones/mis-calificaciones')
+        .then(r => setDocenteNotasCount(r.data.length))
+        .catch(() => {});
+      api.get('/anotaciones')
+        .then(r => setUltimasAnotaciones(r.data.slice(-5).reverse()))
+        .catch(() => {});
+      api.get('/usuarios')
+        .then(r => setTodosUsuarios(r.data))
         .catch(() => {});
     } else if (role === 'ESTUDIANTE') {
       api.get(`/calificaciones/estudiante/${user.id}`)
         .then(r => setMisNotas(r.data))
+        .catch(() => {});
+      api.get(`/anotaciones/estudiante/${user.id}`)
+        .then(r => setEstAnotaciones(r.data.slice(-5).reverse()))
+        .catch(() => {});
+      api.get('/asistencias')
+        .then(r => {
+          const misAsis = r.data.filter(a => a.idEstudiante === user.id);
+          setEstAsistenciaTotal(misAsis.length);
+          setEstAsistenciaPresente(misAsis.filter(a => a.estadoAsistencia === 'PRESENTE').length);
+        })
+        .catch(() => {});
+      api.get('/matriculas')
+        .then(r => setEstCursosCount(r.data.filter(m => m.estudianteId === user.id).length))
         .catch(() => {});
     }
   }, [role, user]);
@@ -127,44 +171,175 @@ export default function Dashboard() {
       )}
 
       {role === 'DOCENTE' && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {docenteCards.map((card) => (
-            <div key={card.label} className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-500">{card.label}</p>
-                  <p className="text-3xl font-bold text-gray-800 mt-1">{card.value}</p>
+                  <p className="text-sm text-gray-500">Mis Asignaturas</p>
+                  <p className="text-3xl font-bold text-gray-800 mt-1">{docenteAsigCount}</p>
                 </div>
-                <div className={`w-12 h-12 ${card.color} rounded-lg flex items-center justify-center text-xl`}>
-                  {card.icon}
-                </div>
+                <div className="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center text-xl">📖</div>
               </div>
             </div>
-          ))}
-        </div>
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-500">Total Estudiantes</p>
+                  <p className="text-3xl font-bold text-gray-800 mt-1">{docenteEstCount}</p>
+                </div>
+                <div className="w-12 h-12 bg-purple-500 rounded-lg flex items-center justify-center text-xl">👥</div>
+              </div>
+            </div>
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-500">Calificaciones</p>
+                  <p className="text-3xl font-bold text-gray-800 mt-1">{docenteNotasCount}</p>
+                </div>
+                <div className="w-12 h-12 bg-green-500 rounded-lg flex items-center justify-center text-xl">📊</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">Últimas Anotaciones</h2>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100">
+                    <th className="text-left py-3 px-2 text-gray-500 font-medium">Estudiante</th>
+                    <th className="text-left py-3 px-2 text-gray-500 font-medium">Tipo</th>
+                    <th className="text-left py-3 px-2 text-gray-500 font-medium">Fecha</th>
+                    <th className="text-left py-3 px-2 text-gray-500 font-medium">Descripción</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ultimasAnotaciones.map((a) => {
+                    const est = todosUsuarios.find(u => u.id === a.idEstudiante);
+                    return (
+                      <tr key={a.idAnotacion} className="border-b border-gray-50 hover:bg-gray-50">
+                        <td className="py-3 px-2 font-medium">{est ? `${est.nombres} ${est.apellidos}` : `ID: ${a.idEstudiante}`}</td>
+                        <td className="py-3 px-2">
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                            a.tipoAnotacion === 'POSITIVA' ? 'bg-green-100 text-green-700' :
+                            a.tipoAnotacion === 'NEGATIVA' ? 'bg-red-100 text-red-700' :
+                            'bg-yellow-100 text-yellow-700'
+                          }`}>{a.tipoAnotacion}</span>
+                        </td>
+                        <td className="py-3 px-2 text-gray-600">{a.fecha}</td>
+                        <td className="py-3 px-2 text-gray-600 max-w-[300px] truncate">{a.descripcion}</td>
+                      </tr>
+                    );
+                  })}
+                  {ultimasAnotaciones.length === 0 && (
+                    <tr><td colSpan={4} className="py-8 text-center text-gray-400">No hay anotaciones registradas</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">Acciones Rápidas</h2>
+            <div className="flex flex-wrap gap-3">
+              <button onClick={() => navigate('/docente/asistencia')} className="flex items-center gap-2 px-5 py-3 bg-blue-50 text-blue-700 rounded-xl hover:bg-blue-100 transition-colors font-medium">
+                ✅ Registrar Asistencia
+              </button>
+              <button onClick={() => navigate('/docente/anotaciones')} className="flex items-center gap-2 px-5 py-3 bg-yellow-50 text-yellow-700 rounded-xl hover:bg-yellow-100 transition-colors font-medium">
+                📝 Registrar Anotación
+              </button>
+              <button onClick={() => navigate('/docente/asignaturas')} className="flex items-center gap-2 px-5 py-3 bg-green-50 text-green-700 rounded-xl hover:bg-green-100 transition-colors font-medium">
+                📊 Ver Calificaciones
+              </button>
+              <button onClick={() => navigate('/docente/cursos')} className="flex items-center gap-2 px-5 py-3 bg-purple-50 text-purple-700 rounded-xl hover:bg-purple-100 transition-colors font-medium">
+                👥 Ver Cursos
+              </button>
+            </div>
+          </div>
+        </>
       )}
 
       {role === 'ESTUDIANTE' && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500">Notas Registradas</p>
-                <p className="text-3xl font-bold text-gray-800 mt-1">{estudianteNotas}</p>
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-500">Notas Registradas</p>
+                  <p className="text-3xl font-bold text-gray-800 mt-1">{estudianteNotas}</p>
+                </div>
+                <div className="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center text-xl">📊</div>
               </div>
-              <div className="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center text-xl">📊</div>
+            </div>
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-500">Promedio General</p>
+                  <p className="text-3xl font-bold text-primary-800 mt-1">{estudiantePromedio}</p>
+                </div>
+                <div className="w-12 h-12 bg-green-500 rounded-lg flex items-center justify-center text-xl">⭐</div>
+              </div>
+            </div>
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-500">Mis Cursos</p>
+                  <p className="text-3xl font-bold text-gray-800 mt-1">{estCursosCount}</p>
+                </div>
+                <div className="w-12 h-12 bg-purple-500 rounded-lg flex items-center justify-center text-xl">📚</div>
+              </div>
             </div>
           </div>
+
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500">Promedio General</p>
-                <p className="text-3xl font-bold text-primary-800 mt-1">{estudiantePromedio}</p>
-              </div>
-              <div className="w-12 h-12 bg-green-500 rounded-lg flex items-center justify-center text-xl">⭐</div>
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">Últimas Anotaciones</h2>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100">
+                    <th className="text-left py-3 px-2 text-gray-500 font-medium">Tipo</th>
+                    <th className="text-left py-3 px-2 text-gray-500 font-medium">Fecha</th>
+                    <th className="text-left py-3 px-2 text-gray-500 font-medium">Descripción</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {estAnotaciones.map((a) => (
+                    <tr key={a.idAnotacion} className="border-b border-gray-50 hover:bg-gray-50">
+                      <td className="py-3 px-2">
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                          a.tipoAnotacion === 'POSITIVA' ? 'bg-green-100 text-green-700' :
+                          a.tipoAnotacion === 'NEGATIVA' ? 'bg-red-100 text-red-700' :
+                          'bg-yellow-100 text-yellow-700'
+                        }`}>{a.tipoAnotacion}</span>
+                      </td>
+                      <td className="py-3 px-2 text-gray-600">{a.fecha}</td>
+                      <td className="py-3 px-2 text-gray-600 max-w-[400px] truncate">{a.descripcion}</td>
+                    </tr>
+                  ))}
+                  {estAnotaciones.length === 0 && (
+                    <tr><td colSpan={3} className="py-8 text-center text-gray-400">No tienes anotaciones registradas</td></tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
-        </div>
+
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">Acciones Rápidas</h2>
+            <div className="flex flex-wrap gap-3">
+              <button onClick={() => navigate('/estudiante/cursos')} className="flex items-center gap-2 px-5 py-3 bg-purple-50 text-purple-700 rounded-xl hover:bg-purple-100 transition-colors font-medium">
+                📚 Mis Cursos
+              </button>
+              <button onClick={() => navigate('/estudiante/asistencia')} className="flex items-center gap-2 px-5 py-3 bg-blue-50 text-blue-700 rounded-xl hover:bg-blue-100 transition-colors font-medium">
+                ✅ Mi Asistencia
+              </button>
+              <button onClick={() => navigate('/estudiante/notas')} className="flex items-center gap-2 px-5 py-3 bg-green-50 text-green-700 rounded-xl hover:bg-green-100 transition-colors font-medium">
+                📊 Mis Notas
+              </button>
+            </div>
+          </div>
+        </>
       )}
     </div>
   );

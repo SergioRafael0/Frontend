@@ -18,14 +18,12 @@ const docenteItems = [
   { path: '/docente/asignaturas', label: 'Mis Asignaturas', icon: '📖' },
   { path: '/docente/asistencia', label: 'Registrar Asistencia', icon: '✅' },
   { path: '/docente/anotaciones', label: 'Anotaciones', icon: '📋' },
-  { path: '/docente/notas', label: 'Calificaciones', icon: '📊' },
 ];
 
 const estudianteItems = [
   { path: '/', label: 'Dashboard', icon: '📊' },
-  { path: '/estudiante/cursos', label: 'Mis Cursos', icon: '📚' },
+  { path: '/estudiante/cursos', label: 'Mis Asignaturas', icon: '📚' },
   { path: '/estudiante/asistencia', label: 'Mi Asistencia', icon: '✅' },
-  { path: '/estudiante/notas', label: 'Mis Notas', icon: '📊' },
 ];
 
 export default function Sidebar({ open, onClose }) {

@@ -1,12 +1,24 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
+import { getErrorMessage } from '../../utils/errorHandler';
 
 export default function RegistroAnotaciones() {
   const { user } = useAuth();
-  const [form, setForm] = useState({ idEstudiante: '', fecha: '', tipoAnotacion: 'OBSERVACION', descripcion: '' });
+  const [estudiantes, setEstudiantes] = useState([]);
+  const [form, setForm] = useState({ idEstudiante: '', fecha: new Date().toISOString().split('T')[0], tipoAnotacion: 'OBSERVACION', descripcion: '' });
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState('');
+
+  useEffect(() => {
+    api.get('/usuarios')
+      .then(r => setEstudiantes(
+        r.data
+          .filter(u => u.rol === 'ESTUDIANTE')
+          .sort((a, b) => `${a.apellidos} ${a.nombres}`.localeCompare(`${b.apellidos} ${b.nombres}`))
+      ))
+      .catch(() => {});
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -21,9 +33,9 @@ export default function RegistroAnotaciones() {
         descripcion: form.descripcion,
       });
       setSuccess('Anotación registrada exitosamente');
-      setForm({ idEstudiante: '', fecha: '', tipoAnotacion: 'OBSERVACION', descripcion: '' });
+      setForm({ idEstudiante: '', fecha: new Date().toISOString().split('T')[0], tipoAnotacion: 'OBSERVACION', descripcion: '' });
     } catch (err) {
-      alert(err.response?.data?.message || 'Error al registrar');
+      alert(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -33,13 +45,23 @@ export default function RegistroAnotaciones() {
     <div className="max-w-lg mx-auto space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-800">Registrar Anotación</h1>
-        <p className="text-gray-500 mt-1">Ingresa los datos de la anotación</p>
+        <p className="text-gray-500 mt-1">Selecciona el estudiante y completa los datos</p>
       </div>
       {success && <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm">{success}</div>}
       <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">ID Estudiante</label>
-          <input type="number" value={form.idEstudiante} onChange={(e) => setForm({ ...form, idEstudiante: e.target.value })} required className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary-500" />
+          <label className="block text-sm font-medium text-gray-700 mb-1">Estudiante</label>
+          <select
+            value={form.idEstudiante}
+            onChange={(e) => setForm({ ...form, idEstudiante: e.target.value })}
+            required
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary-500"
+          >
+            <option value="">Seleccionar estudiante...</option>
+            {estudiantes.map((e) => (
+              <option key={e.id} value={e.id}>{e.apellidos}, {e.nombres} (ID: {e.id})</option>
+            ))}
+          </select>
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Fecha</label>
