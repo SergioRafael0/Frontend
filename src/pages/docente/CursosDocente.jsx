@@ -1,20 +1,24 @@
 import { useState, useEffect } from 'react';
 import api from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 
 export default function CursosDocente() {
+  const { user } = useAuth();
   const [cursos, setCursos] = useState([]);
-  const [asignaturas, setAsignaturas] = useState([]);
+  const [asignaturasDelDocente, setAsignaturasDelDocente] = useState([]);
   const [usuarios, setUsuarios] = useState([]);
   const [expanded, setExpanded] = useState({});
 
   useEffect(() => {
     api.get('/cursos').then(r => setCursos(r.data)).catch(() => {});
-    api.get('/asignaturas').then(r => setAsignaturas(r.data)).catch(() => {});
+    if (user?.id) {
+      api.get(`/asignaturas/docente/${user.id}`).then(r => setAsignaturasDelDocente(r.data)).catch(() => {});
+    }
     api.get('/usuarios').then(r => setUsuarios(r.data)).catch(() => {});
-  }, []);
+  }, [user]);
 
   const getAsignaturasDeCurso = (cursoId) =>
-    asignaturas.filter(a => a.cursoId === cursoId);
+    asignaturasDelDocente.filter(a => a.cursoId === cursoId);
 
   const getDocente = (docenteId) =>
     usuarios.find(u => u.id === docenteId);

@@ -1,18 +1,22 @@
 import { useState, useEffect } from 'react';
 import api from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 import CalificacionesModal from './CalificacionesModal';
 
 export default function MisAsignaturas() {
+  const { user } = useAuth();
   const [asignaturas, setAsignaturas] = useState([]);
   const [cursos, setCursos] = useState([]);
   const [usuarios, setUsuarios] = useState([]);
   const [selectedAsig, setSelectedAsig] = useState(null);
 
   useEffect(() => {
-    api.get('/asignaturas').then(r => setAsignaturas(r.data)).catch(() => {});
+    if (user?.id) {
+      api.get(`/asignaturas/docente/${user.id}`).then(r => setAsignaturas(r.data)).catch(() => {});
+    }
     api.get('/cursos').then(r => setCursos(r.data)).catch(() => {});
     api.get('/usuarios').then(r => setUsuarios(r.data)).catch(() => {});
-  }, []);
+  }, [user]);
 
   const getCurso = (cursoId) => cursos.find(c => c.id === cursoId);
   const getCursoNombre = (cursoId) => {

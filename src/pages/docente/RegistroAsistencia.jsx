@@ -5,7 +5,7 @@ import { getErrorMessage } from '../../utils/errorHandler';
 
 export default function RegistroAsistencia() {
   const { user } = useAuth();
-  const [cursos, setCursos] = useState([]);
+  const [cursosDelDocente, setCursosDelDocente] = useState([]);
   const [usuarios, setUsuarios] = useState([]);
   const [selectedCurso, setSelectedCurso] = useState('');
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0]);
@@ -14,9 +14,18 @@ export default function RegistroAsistencia() {
   const [success, setSuccess] = useState('');
 
   useEffect(() => {
-    api.get('/cursos').then(r => setCursos(r.data)).catch(() => {});
     api.get('/usuarios').then(r => setUsuarios(r.data)).catch(() => {});
-  }, []);
+    if (user?.id) {
+      api.get(`/asignaturas/docente/${user.id}`).then(r => {
+        const asigs = r.data;
+        const cursoIds = [...new Set(asigs.map(a => a.cursoId))];
+        api.get('/cursos').then(cRes => {
+          const cursosFiltrados = cRes.data.filter(c => cursoIds.includes(c.id));
+          setCursosDelDocente(cursosFiltrados);
+        }).catch(() => {});
+      }).catch(() => {});
+    }
+  }, [user]);
 
   useEffect(() => {
     if (!selectedCurso) { setEstudiantes([]); return; }
@@ -97,7 +106,7 @@ export default function RegistroAsistencia() {
               className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary-500"
             >
               <option value="">Seleccionar curso...</option>
-              {cursos.map((c) => (
+              {cursosDelDocente.map((c) => (
                 <option key={c.id} value={c.id}>
                   {getCursoLabel(c)} (ID: {c.id})
                 </option>
