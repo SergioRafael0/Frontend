@@ -3,6 +3,7 @@ import { AuthProvider } from './context/AuthContext';
 import PrivateRoute from './components/common/PrivateRoute';
 import MainLayout from './components/layouts/MainLayout';
 import Login from './pages/login/Login';
+import Register from './pages/login/Register';
 import Dashboard from './pages/admin/Dashboard';
 import GestionUsuarios from './pages/admin/GestionUsuarios';
 import GestionCursos from './pages/admin/GestionCursos';
@@ -12,6 +13,7 @@ import GestionAsistencias from './pages/admin/GestionAsistencias';
 import GestionAnotaciones from './pages/admin/GestionAnotaciones';
 import GestionCalificaciones from './pages/admin/GestionCalificaciones';
 import MisAsignaturas from './pages/docente/MisAsignaturas';
+import CursosDocente from './pages/docente/CursosDocente';
 import RegistroAsistencia from './pages/docente/RegistroAsistencia';
 import RegistroAnotaciones from './pages/docente/RegistroAnotaciones';
 import RegistroNotas from './pages/docente/RegistroNotas';
@@ -25,6 +27,7 @@ function App() {
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
           <Route
             element={
               <PrivateRoute>
@@ -65,6 +68,10 @@ function App() {
             />
 
             {/* Docente routes */}
+            <Route
+              path="/docente/cursos"
+              element={<PrivateRoute roles={['DOCENTE']}><CursosDocente /></PrivateRoute>}
+            />
             <Route
               path="/docente/asignaturas"
               element={<PrivateRoute roles={['DOCENTE']}><MisAsignaturas /></PrivateRoute>}

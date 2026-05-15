@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../../services/api';
 import { getErrorMessage } from '../../utils/errorHandler';
+import { formatearRut } from '../../utils/rutUtils';
 
 export default function GestionUsuarios() {
   const [usuarios, setUsuarios] = useState([]);
@@ -135,7 +136,7 @@ export default function GestionUsuarios() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">RUT</label>
-                  <input value={form.rut} onChange={(e) => setForm({ ...form, rut: e.target.value })} required className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary-500" />
+                  <input value={form.rut} onChange={(e) => setForm({ ...form, rut: formatearRut(e.target.value) })} required className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary-500" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Rol</label>
