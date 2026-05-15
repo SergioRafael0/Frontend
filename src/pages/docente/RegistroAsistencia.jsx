@@ -1,72 +1,195 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
+import { getErrorMessage } from '../../utils/errorHandler';
 
 export default function RegistroAsistencia() {
   const { user } = useAuth();
-  const [form, setForm] = useState({ idEstudiante: '', idCurso: '', fecha: '', estadoAsistencia: 'PRESENTE', observacion: '' });
+  const [cursos, setCursos] = useState([]);
+  const [usuarios, setUsuarios] = useState([]);
+  const [selectedCurso, setSelectedCurso] = useState('');
+  const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0]);
+  const [estudiantes, setEstudiantes] = useState([]);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState('');
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setSuccess('');
-    try {
-      await api.post('/asistencias', {
-        idEstudiante: parseInt(form.idEstudiante),
-        idDocente: user.id,
-        idCurso: parseInt(form.idCurso),
-        fecha: form.fecha,
-        estadoAsistencia: form.estadoAsistencia,
-        observacion: form.observacion,
-      });
-      setSuccess('Asistencia registrada exitosamente');
-      setForm({ idEstudiante: '', idCurso: '', fecha: '', estadoAsistencia: 'PRESENTE', observacion: '' });
-    } catch (err) {
-      alert(err.response?.data?.message || 'Error al registrar');
-    } finally {
-      setLoading(false);
-    }
+  useEffect(() => {
+    api.get('/cursos').then(r => setCursos(r.data)).catch(() => {});
+    api.get('/usuarios').then(r => setUsuarios(r.data)).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!selectedCurso) { setEstudiantes([]); return; }
+    api.get(`/matriculas/curso/${selectedCurso}`)
+      .then(r => {
+        const alumnos = r.data.map(m => ({
+          estudianteId: m.estudianteId,
+          estado: 'PRESENTE',
+          observacion: '',
+        }));
+        setEstudiantes(alumnos);
+      })
+      .catch(() => setEstudiantes([]));
+  }, [selectedCurso]);
+
+  const getUsuario = (id) => usuarios.find(u => u.id === id);
+
+  const actualizarEstado = (estudianteId, estado) => {
+    setEstudiantes(prev =>
+      prev.map(e => e.estudianteId === estudianteId ? { ...e, estado } : e)
+    );
   };
 
+  const actualizarObservacion = (estudianteId, observacion) => {
+    setEstudiantes(prev =>
+      prev.map(e => e.estudianteId === estudianteId ? { ...e, observacion } : e)
+    );
+  };
+
+  const handleGuardar = async () => {
+    if (!selectedCurso || !fecha) return;
+    setLoading(true);
+    setSuccess('');
+    let errors = [];
+    for (const est of estudiantes) {
+      try {
+        await api.post('/asistencias', {
+          idEstudiante: est.estudianteId,
+          idDocente: user.id,
+          idCurso: parseInt(selectedCurso),
+          fecha,
+          estadoAsistencia: est.estado,
+          observacion: est.observacion || '',
+        });
+      } catch (err) {
+        errors.push(`Estudiante ID ${est.estudianteId}: ${getErrorMessage(err)}`);
+      }
+    }
+    if (errors.length === 0) {
+      setSuccess(`Asistencia registrada exitosamente para ${estudiantes.length} estudiantes`);
+    } else {
+      alert('Errores:\n' + errors.join('\n'));
+    }
+    setLoading(false);
+  };
+
+  const getCursoLabel = (curso) =>
+    curso ? `${curso.nivel} ${curso.letra}` : '';
+
   return (
-    <div className="max-w-lg mx-auto space-y-6">
+    <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-800">Registrar Asistencia</h1>
-        <p className="text-gray-500 mt-1">Ingresa los datos de la asistencia</p>
+        <p className="text-gray-500 mt-1">Selecciona curso y fecha para registrar asistencia</p>
       </div>
-      {success && <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm">{success}</div>}
-      <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">ID Estudiante</label>
-          <input type="number" value={form.idEstudiante} onChange={(e) => setForm({ ...form, idEstudiante: e.target.value })} required className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary-500" />
+
+      {success && (
+        <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm">{success}</div>
+      )}
+
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Curso</label>
+            <select
+              value={selectedCurso}
+              onChange={(e) => setSelectedCurso(e.target.value)}
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary-500"
+            >
+              <option value="">Seleccionar curso...</option>
+              {cursos.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {getCursoLabel(c)} (ID: {c.id})
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="sm:w-56">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Fecha</label>
+            <input
+              type="date"
+              value={fecha}
+              onChange={(e) => setFecha(e.target.value)}
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary-500"
+            />
+          </div>
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">ID Curso</label>
-          <input type="number" value={form.idCurso} onChange={(e) => setForm({ ...form, idCurso: e.target.value })} required className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary-500" />
+      </div>
+
+      {selectedCurso && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="text-left py-3 px-4 text-gray-500 font-medium">Nombre</th>
+                  <th className="text-left py-3 px-4 text-gray-500 font-medium">Apellido</th>
+                  <th className="text-left py-3 px-4 text-gray-500 font-medium">ID</th>
+                  <th className="text-left py-3 px-4 text-gray-500 font-medium">Estado</th>
+                  <th className="text-left py-3 px-4 text-gray-500 font-medium">Observación</th>
+                </tr>
+              </thead>
+              <tbody>
+                {estudiantes.map((est) => {
+                  const usr = getUsuario(est.estudianteId);
+                  return (
+                    <tr key={est.estudianteId} className="border-b border-gray-50 hover:bg-gray-50">
+                      <td className="py-3 px-4 font-medium">{usr?.nombres || '—'}</td>
+                      <td className="py-3 px-4 text-gray-600">{usr?.apellidos || '—'}</td>
+                      <td className="py-3 px-4 text-gray-600">{est.estudianteId}</td>
+                      <td className="py-3 px-4">
+                        <select
+                          value={est.estado}
+                          onChange={(e) => actualizarEstado(est.estudianteId, e.target.value)}
+                          className={`px-3 py-1.5 rounded-lg text-sm font-medium border outline-none focus:ring-2 focus:ring-primary-500 ${
+                            est.estado === 'PRESENTE' ? 'bg-green-50 border-green-300 text-green-700' :
+                            est.estado === 'AUSENTE' ? 'bg-red-50 border-red-300 text-red-700' :
+                            est.estado === 'ATRASADO' ? 'bg-yellow-50 border-yellow-300 text-yellow-700' :
+                            'bg-blue-50 border-blue-300 text-blue-700'
+                          }`}
+                        >
+                          <option value="PRESENTE">PRESENTE</option>
+                          <option value="AUSENTE">AUSENTE</option>
+                          <option value="ATRASADO">ATRASADO</option>
+                          <option value="JUSTIFICADO">JUSTIFICADO</option>
+                        </select>
+                      </td>
+                      <td className="py-3 px-4">
+                        <input
+                          type="text"
+                          value={est.observacion}
+                          onChange={(e) => actualizarObservacion(est.estudianteId, e.target.value)}
+                          placeholder="Sin observación"
+                          maxLength={250}
+                          className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary-500"
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
+                {estudiantes.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="py-8 text-center text-gray-400">
+                      {selectedCurso ? 'No hay estudiantes matriculados en este curso' : 'Selecciona un curso'}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          {estudiantes.length > 0 && (
+            <div className="px-4 py-4 bg-gray-50 border-t border-gray-100 flex justify-end">
+              <button
+                onClick={handleGuardar}
+                disabled={loading}
+                className="bg-primary-800 hover:bg-primary-700 text-white font-medium px-6 py-2.5 rounded-lg transition-colors disabled:opacity-50"
+              >
+                {loading ? 'Guardando...' : `Guardar Asistencias (${estudiantes.length})`}
+              </button>
+            </div>
+          )}
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Fecha</label>
-          <input type="date" value={form.fecha} onChange={(e) => setForm({ ...form, fecha: e.target.value })} required className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary-500" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
-          <select value={form.estadoAsistencia} onChange={(e) => setForm({ ...form, estadoAsistencia: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary-500">
-            <option value="PRESENTE">Presente</option>
-            <option value="AUSENTE">Ausente</option>
-            <option value="ATRASADO">Atrasado</option>
-            <option value="JUSTIFICADO">Justificado</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Observación</label>
-          <textarea value={form.observacion} onChange={(e) => setForm({ ...form, observacion: e.target.value })} rows={2} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary-500" />
-        </div>
-        <button type="submit" disabled={loading} className="w-full bg-primary-800 hover:bg-primary-700 text-white font-medium py-2.5 rounded-lg transition-colors disabled:opacity-50">
-          {loading ? 'Registrando...' : 'Registrar Asistencia'}
-        </button>
-      </form>
+      )}
     </div>
   );
 }

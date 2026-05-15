@@ -14,6 +14,7 @@ const adminItems = [
 
 const docenteItems = [
   { path: '/', label: 'Dashboard', icon: '📊' },
+  { path: '/docente/cursos', label: 'Cursos', icon: '📚' },
   { path: '/docente/asignaturas', label: 'Mis Asignaturas', icon: '📖' },
   { path: '/docente/asistencia', label: 'Registrar Asistencia', icon: '✅' },
   { path: '/docente/anotaciones', label: 'Anotaciones', icon: '📋' },

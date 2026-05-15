@@ -68,6 +68,13 @@ export default function Login() {
             >
               {loading ? 'Ingresando...' : 'Iniciar Sesión'}
             </button>
+            <button
+              type="button"
+              onClick={() => navigate('/register')}
+              className="w-full bg-gray-100 hover:bg-gray-200 text-blue-600 font-semibold py-2.5 rounded-lg transition-colors"
+            >
+              Registrarse
+            </button>
           </form>
         </div>
         <p className="text-center text-primary-200 text-xs mt-4">
