@@ -25,8 +25,8 @@ export default function CalificacionesModal({ asignatura, cursoNombre, onClose }
         setUsuarios(usuariosRes.data);
 
         const notasPromises = matriculasRes.data.map(m =>
-          api.get('/calificaciones', { params: { estudianteId: m.estudianteId, asignaturaId: asignatura.id } })
-            .then(r => ({ estudianteId: m.estudianteId, notas: r.data }))
+          api.get(`/calificaciones/estudiante/${m.estudianteId}`)
+            .then(r => ({ estudianteId: m.estudianteId, notas: r.data.filter(n => n.asignaturaId === asignatura.id) }))
             .catch(() => ({ estudianteId: m.estudianteId, notas: [] }))
         );
         const resultados = await Promise.all(notasPromises);
