@@ -18,7 +18,20 @@ export default function Login() {
       await login({ email, password });
       navigate('/');
     } catch (err) {
-      const mensaje = err.response?.data?.message || err.response?.data?.error || 'Credenciales inválidas';
+      const data = err.response?.data;
+      let mensaje = 'Credenciales inválidas';
+      if (data) {
+        if (typeof data.message === 'string') {
+          try {
+            const parsed = JSON.parse(data.message);
+            mensaje = parsed.message || parsed.error || mensaje;
+          } catch {
+            mensaje = data.message;
+          }
+        } else if (data.errors) {
+          mensaje = Object.values(data.errors).join('. ');
+        }
+      }
       setError(mensaje);
       return;
     } finally {

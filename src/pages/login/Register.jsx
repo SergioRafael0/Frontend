@@ -27,7 +27,21 @@ export default function Register() {
       setSuccess('Usuario registrado exitosamente. Redirigiendo al login...');
       setTimeout(() => navigate('/login'), 2000);
     } catch (err) {
-      setError(err.response?.data?.message || 'Error al registrar');
+      const data = err.response?.data;
+      let mensaje = 'Error al registrar';
+      if (data) {
+        if (typeof data.message === 'string') {
+          try {
+            const parsed = JSON.parse(data.message);
+            mensaje = parsed.message || parsed.error || mensaje;
+          } catch {
+            mensaje = data.message;
+          }
+        } else if (data.errors) {
+          mensaje = Object.values(data.errors).join('. ');
+        }
+      }
+      setError(mensaje);
     } finally {
       setLoading(false);
     }
