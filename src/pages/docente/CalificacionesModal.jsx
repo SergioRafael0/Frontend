@@ -2,8 +2,6 @@ import { useState, useEffect, useRef } from 'react';
 import api from '../../services/api';
 import { getErrorMessage } from '../../utils/errorHandler';
 
-const EVALS = ['Ev1', 'Ev2', 'Ev3', 'EF'];
-
 export default function CalificacionesModal({ asignatura, cursoNombre, onClose }) {
   const [students, setStudents] = useState([]);
   const [originalData, setOriginalData] = useState({});
@@ -12,6 +10,7 @@ export default function CalificacionesModal({ asignatura, cursoNombre, onClose }
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [usuarios, setUsuarios] = useState([]);
+  const [evaluaciones, setEvaluaciones] = useState([]);
   const dataRef = useRef({});
 
   useEffect(() => {
@@ -31,12 +30,18 @@ export default function CalificacionesModal({ asignatura, cursoNombre, onClose }
         );
         const resultados = await Promise.all(notasPromises);
 
+        const allDescripciones = [...new Set(
+          resultados.flatMap(r => r.notas.map(n => n.descripcion).filter(Boolean))
+        )];
+        const evals = allDescripciones.length > 0 ? allDescripciones : ['Nota'];
+        setEvaluaciones(evals);
+
         const data = {};
         const original = {};
         for (const r of resultados) {
           const usr = usuariosRes.data.find(u => u.id === r.estudianteId);
           const notas = {};
-          for (const ev of EVALS) {
+          for (const ev of evals) {
             const existing = r.notas.find(n => n.descripcion === ev);
             notas[ev] = existing
               ? { id: existing.id, nota: existing.nota }
@@ -90,8 +95,32 @@ export default function CalificacionesModal({ asignatura, cursoNombre, onClose }
   };
 
   const calcularPromedio = (notas) => {
-    const sum = EVALS.reduce((acc, ev) => acc + (notas[ev]?.nota || 0), 0);
-    return (sum / 4).toFixed(1);
+    const active = evaluaciones.filter(ev => notas[ev]?.nota != null);
+    if (active.length === 0) return '0.0';
+    const sum = active.reduce((acc, ev) => acc + notas[ev].nota, 0);
+    return (sum / active.length).toFixed(1);
+  };
+
+  const handleAgregarEvaluacion = () => {
+    const name = window.prompt('Nombre de la nueva evaluación:');
+    if (!name || !name.trim()) return;
+    const trimmed = name.trim();
+    if (evaluaciones.includes(trimmed)) {
+      alert('Ya existe una evaluación con ese nombre.');
+      return;
+    }
+    const newEvals = [...evaluaciones, trimmed];
+    setEvaluaciones(newEvals);
+
+    const data = { ...dataRef.current };
+    for (const sid of Object.keys(data)) {
+      data[sid] = {
+        ...data[sid],
+        notas: { ...data[sid].notas, [trimmed]: { id: null, nota: null } },
+      };
+    }
+    dataRef.current = data;
+    setStudents(Object.values(data));
   };
 
   const handleGuardar = async () => {
@@ -100,11 +129,13 @@ export default function CalificacionesModal({ asignatura, cursoNombre, onClose }
 
     const puts = [];
     const posts = [];
-    for (const estudianteId of Object.keys(dirty)) {
-      const [sid, evalName] = estudianteId.split('_');
-      if (!dirty[estudianteId]) continue;
+    for (const key of Object.keys(dirty)) {
+      if (!dirty[key]) continue;
+      const idx = key.indexOf('_');
+      const sid = key.substring(0, idx);
+      const evalName = key.substring(idx + 1);
       const nota = dataRef.current[sid]?.notas[evalName];
-      if (!nota) continue;
+      if (!nota || nota.nota == null) continue;
 
       const body = {
         estudianteId: parseInt(sid),
@@ -140,7 +171,6 @@ export default function CalificacionesModal({ asignatura, cursoNombre, onClose }
         className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <div>
             <h2 className="text-lg font-bold text-gray-800">Calificaciones</h2>
@@ -149,7 +179,6 @@ export default function CalificacionesModal({ asignatura, cursoNombre, onClose }
           <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 text-xl">&times;</button>
         </div>
 
-        {/* Body */}
         <div className="flex-1 overflow-auto p-6">
           {loading ? (
             <div className="text-center py-8 text-gray-400">Cargando estudiantes...</div>
@@ -161,9 +190,18 @@ export default function CalificacionesModal({ asignatura, cursoNombre, onClose }
                 <thead>
                   <tr className="border-b border-gray-200">
                     <th className="text-left py-3 px-3 text-gray-500 font-medium min-w-[160px]">Estudiante</th>
-                    {EVALS.map(ev => (
+                    {evaluaciones.map(ev => (
                       <th key={ev} className="text-center py-3 px-3 text-gray-500 font-medium w-20">{ev}</th>
                     ))}
+                    <th className="text-center py-3 px-3 text-gray-500 font-medium w-16">
+                      <button
+                        onClick={handleAgregarEvaluacion}
+                        className="px-2 py-1 text-xs bg-primary-100 text-primary-800 rounded hover:bg-primary-200"
+                        title="Agregar evaluación"
+                      >
+                        + Eval
+                      </button>
+                    </th>
                     <th className="text-center py-3 px-3 text-gray-500 font-medium w-20">Prom</th>
                   </tr>
                 </thead>
@@ -173,7 +211,7 @@ export default function CalificacionesModal({ asignatura, cursoNombre, onClose }
                       <td className="py-2.5 px-3 font-medium text-gray-800">
                         {s.nombre} {s.apellido}
                       </td>
-                      {EVALS.map(ev => (
+                      {evaluaciones.map(ev => (
                         <td key={ev} className="py-2.5 px-3 text-center">
                           <input
                             type="number"
@@ -191,6 +229,7 @@ export default function CalificacionesModal({ asignatura, cursoNombre, onClose }
                           />
                         </td>
                       ))}
+                      <td className="py-2.5 px-3 text-center" />
                       <td className="py-2.5 px-3 text-center font-semibold text-primary-800">
                         {calcularPromedio(s.notas)}
                       </td>
@@ -202,7 +241,6 @@ export default function CalificacionesModal({ asignatura, cursoNombre, onClose }
           )}
         </div>
 
-        {/* Footer */}
         <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
           {error && <p className="text-sm text-red-600">{error}</p>}
           <div className="flex-1" />
@@ -215,7 +253,7 @@ export default function CalificacionesModal({ asignatura, cursoNombre, onClose }
               disabled={saving || dirtyCount === 0}
               className="px-4 py-2 text-sm text-white bg-primary-800 rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center gap-2"
             >
-              💾 Guardar Cambios {dirtyCount > 0 && `(${dirtyCount})`}
+              Guardar Cambios {dirtyCount > 0 && `(${dirtyCount})`}
             </button>
           </div>
         </div>

@@ -2,8 +2,6 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
 
-const EVALS = ['Ev1', 'Ev2', 'Ev3', 'EF'];
-
 export default function MisCursos() {
   const { user } = useAuth();
   const [curso, setCurso] = useState(null);
@@ -28,21 +26,26 @@ export default function MisCursos() {
 
         const asigs = asignaturasRes.data.filter(a => a.cursoId === miMatricula.cursoId);
         const asigsConNotas = asigs.map(a => {
+          const notasDelEstudiante = calificacionesRes.data.filter(c => c.asignaturaId === a.id);
+          const evals = [...new Set(notasDelEstudiante.map(c => c.descripcion))];
           const notas = {};
-          for (const ev of EVALS) {
-            const match = calificacionesRes.data.find(
-              c => c.asignaturaId === a.id && c.descripcion === ev
-            );
+          for (const ev of evals) {
+            const match = notasDelEstudiante.find(c => c.descripcion === ev);
             notas[ev] = match ? { id: match.id, nota: match.nota } : null;
           }
-          const suma = EVALS.reduce((acc, ev) => acc + (notas[ev]?.nota || 0), 0);
-          return { ...a, notas, promedio: (suma / 4).toFixed(1) };
+          const nonNull = Object.values(notas).filter(n => n?.nota != null);
+          const promedio = nonNull.length > 0
+            ? (nonNull.reduce((acc, n) => acc + n.nota, 0) / nonNull.length).toFixed(1)
+            : '0.0';
+          return { ...a, notas, promedio, evaluaciones: evals };
         });
         setAsignaturas(asigsConNotas);
       } catch {}
     };
     loadData();
   }, [user]);
+
+  const allEvals = [...new Set(asignaturas.flatMap(a => a.evaluaciones || []))];
 
   return (
     <div className="space-y-6">
@@ -58,9 +61,12 @@ export default function MisCursos() {
             <thead className="bg-gray-50">
               <tr>
                 <th className="text-left py-3 px-4 text-gray-500 font-medium">Asignatura</th>
-                {EVALS.map(ev => (
-                  <th key={ev} className="text-center py-3 px-3 text-gray-500 font-medium w-16">{ev}</th>
-                ))}
+                {allEvals.length > 0
+                  ? allEvals.map(ev => (
+                      <th key={ev} className="text-center py-3 px-3 text-gray-500 font-medium w-16">{ev}</th>
+                    ))
+                  : <th className="text-center py-3 px-3 text-gray-500 font-medium w-16">Nota</th>
+                }
                 <th className="text-center py-3 px-3 text-gray-500 font-medium w-16">Prom</th>
               </tr>
             </thead>
@@ -68,21 +74,24 @@ export default function MisCursos() {
               {asignaturas.map((asig) => (
                 <tr key={asig.id} className="border-b border-gray-50 hover:bg-gray-50">
                   <td className="py-3 px-4 font-medium text-gray-800">{asig.nombre}</td>
-                  {EVALS.map(ev => (
-                    <td key={ev} className="py-3 px-3 text-center text-gray-700">
-                      {asig.notas[ev]?.nota != null ? asig.notas[ev].nota.toFixed(1) : '—'}
-                    </td>
-                  ))}
+                  {allEvals.length > 0
+                    ? allEvals.map(ev => (
+                        <td key={ev} className="py-3 px-3 text-center text-gray-700">
+                          {asig.notas[ev]?.nota != null ? asig.notas[ev].nota.toFixed(1) : '—'}
+                        </td>
+                      ))
+                    : <td className="py-3 px-3 text-center text-gray-700">—</td>
+                  }
                   <td className="py-3 px-3 text-center font-semibold text-primary-800">
                     {asig.promedio}
                   </td>
                 </tr>
               ))}
               {asignaturas.length === 0 && curso && (
-                <tr><td colSpan={6} className="py-8 text-center text-gray-400">Sin asignaturas en este curso</td></tr>
+                <tr><td colSpan={10} className="py-8 text-center text-gray-400">Sin asignaturas en este curso</td></tr>
               )}
               {!curso && (
-                <tr><td colSpan={6} className="py-8 text-center text-gray-400">No estás matriculado en ningún curso</td></tr>
+                <tr><td colSpan={10} className="py-8 text-center text-gray-400">No estás matriculado en ningún curso</td></tr>
               )}
             </tbody>
           </table>
