@@ -27,25 +27,18 @@ export default function MisCursos() {
         const asigs = asignaturasRes.data.filter(a => a.cursoId === miMatricula.cursoId);
         const asigsConNotas = asigs.map(a => {
           const notasDelEstudiante = calificacionesRes.data.filter(c => c.asignaturaId === a.id);
-          const evals = [...new Set(notasDelEstudiante.map(c => c.descripcion))];
-          const notas = {};
-          for (const ev of evals) {
-            const match = notasDelEstudiante.find(c => c.descripcion === ev);
-            notas[ev] = match ? { id: match.id, nota: match.nota } : null;
-          }
-          const nonNull = Object.values(notas).filter(n => n?.nota != null);
+          const notasStr = notasDelEstudiante.map(c => c.nota.toFixed(1)).join(', ');
+          const nonNull = notasDelEstudiante.filter(c => c.nota != null);
           const promedio = nonNull.length > 0
-            ? (nonNull.reduce((acc, n) => acc + n.nota, 0) / nonNull.length).toFixed(1)
+            ? (nonNull.reduce((acc, c) => acc + c.nota, 0) / nonNull.length).toFixed(1)
             : '0.0';
-          return { ...a, notas, promedio, evaluaciones: evals };
+          return { ...a, notasStr, promedio };
         });
         setAsignaturas(asigsConNotas);
       } catch {}
     };
     loadData();
   }, [user]);
-
-  const allEvals = [...new Set(asignaturas.flatMap(a => a.evaluaciones || []))];
 
   return (
     <div className="space-y-6">
@@ -61,12 +54,7 @@ export default function MisCursos() {
             <thead className="bg-gray-50">
               <tr>
                 <th className="text-left py-3 px-4 text-gray-500 font-medium">Asignatura</th>
-                {allEvals.length > 0
-                  ? allEvals.map(ev => (
-                      <th key={ev} className="text-center py-3 px-3 text-gray-500 font-medium w-16">{ev}</th>
-                    ))
-                  : <th className="text-center py-3 px-3 text-gray-500 font-medium w-16">Nota</th>
-                }
+                <th className="text-center py-3 px-3 text-gray-500 font-medium">Notas</th>
                 <th className="text-center py-3 px-3 text-gray-500 font-medium w-16">Prom</th>
               </tr>
             </thead>
@@ -74,24 +62,15 @@ export default function MisCursos() {
               {asignaturas.map((asig) => (
                 <tr key={asig.id} className="border-b border-gray-50 hover:bg-gray-50">
                   <td className="py-3 px-4 font-medium text-gray-800">{asig.nombre}</td>
-                  {allEvals.length > 0
-                    ? allEvals.map(ev => (
-                        <td key={ev} className="py-3 px-3 text-center text-gray-700">
-                          {asig.notas[ev]?.nota != null ? asig.notas[ev].nota.toFixed(1) : '—'}
-                        </td>
-                      ))
-                    : <td className="py-3 px-3 text-center text-gray-700">—</td>
-                  }
-                  <td className="py-3 px-3 text-center font-semibold text-primary-800">
-                    {asig.promedio}
-                  </td>
+                  <td className="py-3 px-3 text-center text-gray-700">{asig.notasStr || '—'}</td>
+                  <td className="py-3 px-3 text-center font-semibold text-primary-800">{asig.promedio}</td>
                 </tr>
               ))}
               {asignaturas.length === 0 && curso && (
-                <tr><td colSpan={10} className="py-8 text-center text-gray-400">Sin asignaturas en este curso</td></tr>
+                <tr><td colSpan={3} className="py-8 text-center text-gray-400">Sin asignaturas en este curso</td></tr>
               )}
               {!curso && (
-                <tr><td colSpan={10} className="py-8 text-center text-gray-400">No estás matriculado en ningún curso</td></tr>
+                <tr><td colSpan={3} className="py-8 text-center text-gray-400">No estás matriculado en ningún curso</td></tr>
               )}
             </tbody>
           </table>
